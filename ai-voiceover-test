@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel Maker — text to mobile ad</title>
+<style>
+  :root{
+    --bg: #16181a;
+    --panel: #1f2225;
+    --panel-2: #26292d;
+    --line: #34383d;
+    --text: #ececea;
+    --muted: #8a8f94;
+    --amber: #ffb020;
+    --amber-dim: #6b4c14;
+    --teal: #37d6c4;
+    --danger: #ff5c5c;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; height:100%; width:100%; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    width:100%;
+    max-width:100%;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+    background: var(--panel);
+  }
+  header .brand{ display:flex; align-items:center; gap:10px; }
+  header .brand .dot{ width:9px; height:9px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px var(--amber); }
+  header h1{ font-size:15px; font-weight:600; margin:0; letter-spacing:.2px; }
+  header .sub{ font-size:12px; color:var(--muted); font-family: var(--mono); }
+
+  main{
+    flex:1;
+    display:grid;
+    grid-template-columns: minmax(300px, 22%) 1fr;
+    gap:0;
+    min-height:0;
+    width:100%;
+    max-width:1600px;
+    margin:0 auto;
+  }
+  @media (max-width: 860px){
+    main{ grid-template-columns: 1fr; }
+  }
+
+  .rail{
+    background: var(--panel);
+    border-right:1px solid var(--line);
+    padding:20px;
+    overflow-y:auto;
+    display:flex; flex-direction:column; gap:20px;
+    min-width:0; /* prevents grid children from overflowing their track */
+  }
+  .field label{
+    display:block; font-size:12px; color:var(--muted); margin-bottom:8px;
+    font-family: var(--mono); letter-spacing:.2px;
+  }
+  textarea{
+    width:100%; min-height:120px; resize:vertical;
+    background: var(--panel-2); color:var(--text);
+    border:1px solid var(--line); border-radius:6px;
+    padding:10px 12px; font-size:14px; line-height:1.5;
+    font-family: var(--sans);
+  }
+  textarea:focus, select:focus, input[type=range]:focus{ outline:2px solid var(--teal); outline-offset:1px; }
+
+  .swatches{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .swatch{
+    border:1px solid var(--line); border-radius:6px; padding:10px;
+    cursor:pointer; font-size:12.5px; color:var(--text);
+    display:flex; align-items:center; gap:8px;
+    background: var(--panel-2);
+  }
+  .swatch .chip{ width:16px; height:16px; border-radius:4px; flex:none; }
+  .swatch.active{ border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+  .swatch:hover{ border-color:#4a4f55; }
+
+  .chip.studio{ background: linear-gradient(135deg,#1c1f22,#3a3f45); }
+  .chip.sunrise{ background: linear-gradient(135deg,#3a1f4d,#e0703c); }
+  .chip.ocean{ background: linear-gradient(135deg,#0d3b3f,#1b6ea8); }
+  .chip.photo{ background: linear-gradient(135deg,#555,#999); }
+
+  .row{ display:flex; align-items:center; justify-content:space-between; }
+  input[type=range]{ width:100%; accent-color: var(--amber); }
+  .val{ font-family: var(--mono); font-size:12px; color:var(--teal); }
+
+  button{
+    font-family: var(--sans); font-size:13.5px; font-weight:600;
+    border-radius:6px; border:1px solid var(--line);
+    padding:10px 14px; cursor:pointer; color: var(--text);
+    background: var(--panel-2);
+  }
+  button:hover{ border-color:#4a4f55; }
+  button:disabled{ opacity:.45; cursor:not-allowed; }
+  button.primary{
+    background: var(--amber); color:#1a1200; border-color: var(--amber);
+  }
+  button.primary:hover{ filter:brightness(1.06); }
+  .btnrow{ display:flex; gap:8px; }
+
+  .stage{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:26px; gap:16px; min-width:0;
+  }
+  .phone{
+    position:relative;
+    width: min(420px, 90%);
+    border-radius:34px;
+    padding:10px;
+    background: linear-gradient(180deg,#2b2e32,#1a1c1e);
+    box-shadow: 0 20px 50px rgba(0,0,0,.5);
+  }
+  .phone::before{
+    content:""; position:absolute; top:22px; left:50%; transform:translateX(-50%);
+    width:70px; height:6px; border-radius:4px; background:#0f1011; z-index:2;
+  }
+  canvas{
+    display:block; border-radius:26px;
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    height:auto;
+    background:#000;
+  }
+
+  .timeline{
+    width: 100%; max-width:900px;
+    background: var(--panel);
+    border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px;
+  }
+  .timeline .trow{ display:flex; gap:4px; margin-bottom:8px; }
+  .slidechip{
+    flex:1; height:6px; border-radius:3px; background: var(--panel-2);
+    position:relative; overflow:hidden;
+  }
+  .slidechip .fill{
+    position:absolute; left:0; top:0; bottom:0; width:0%;
+    background: var(--teal);
+  }
+  .statusline{ display:flex; justify-content:space-between; font-family: var(--mono); font-size:11.5px; color:var(--muted); }
+  .statusline .msg{ color: var(--text); }
+
+  .download{
+    display:none; align-items:center; gap:10px;
+  }
+  .download a{
+    color:#1a1200; background: var(--teal); text-decoration:none;
+    font-weight:700; font-size:13.5px; padding:9px 14px; border-radius:6px;
+  }
+  .hint{ font-size:11.5px; color:var(--muted); line-height:1.5; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>Reel Maker</h1>
+  </div>
+  <span class="sub">1080×1920 · 30fps · prototype</span>
+</header>
+
+<main>
+  <div class="rail">
+
+    <div class="field">
+      <label>Script</label>
+      <textarea id="scriptInput" placeholder="Paste or write your ad copy. Each sentence becomes one slide — e.g. &quot;Tired of overpaying for hosting? Switch to Nimbus today. Plans start at $4/mo.&quot;"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Background</label>
+      <div class="swatches" id="bgSwatches">
+        <div class="swatch active" data-bg="studio"><span class="chip studio"></span>Studio</div>
+        <div class="swatch" data-bg="sunrise"><span class="chip sunrise"></span>Sunrise</div>
+        <div class="swatch" data-bg="ocean"><span class="chip ocean"></span>Ocean</div>
+        <div class="swatch" data-bg="photo"><span class="chip photo"></span>Photo match</div>
+      </div>
+      <p class="hint" id="bgHint">Solid animated gradient, no external images.</p>
+    </div>
+
+    <div class="field">
+      <div class="row"><label style="margin-bottom:0">Seconds per slide</label><span class="val" id="durVal">2.6s</span></div>
+      <input type="range" id="durSlider" min="1.5" max="4.5" step="0.1" value="2.6">
+    </div>
+
+    <div class="field">
+      <label>Free AI voiceover (included in exported video)</label>
+      <select id="aiVoiceSelect" style="width:100%; margin-top:8px; background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px;">
+        <option value="af_heart">American English — Heart</option>
+        <option value="af_bella">American English — Bella</option>
+        <option value="af_nicole">American English — Nicole</option>
+        <option value="am_michael">American English — Michael</option>
+        <option value="bf_emma">British English — Emma</option>
+        <option value="bm_george">British English — George</option>
+      </select>
+      <div class="row" style="margin-top:10px">
+        <label style="margin-bottom:0">Speaking rate</label><span class="val" id="rateVal">1.0x</span>
+      </div>
+      <input type="range" id="rateSlider" min="0.7" max="1.3" step="0.1" value="1.0">
+      <div class="row" style="margin-top:10px; flex-wrap:wrap">
+        <button id="generateVoiceBtn" type="button">Generate AI voiceover</button>
+        <button id="downloadVoiceBtn" type="button" disabled>Download WAV</button>
+      </div>
+      <audio id="voicePreview" controls style="width:100%; margin-top:10px; display:none"></audio>
+      <p class="hint" id="voiceStatus">Free local AI narration powered by Kokoro. The first use downloads the speech model (around a few hundred MB); generation runs in your browser and may take a while on slower devices. Your script is not sent to a voice API.</p>
+    </div>
+
+    <div class="field">
+      <label>Background music (optional — mixed under AI narration)</label>
+      <input type="file" id="musicInput" accept="audio/*">
+      <p class="hint" id="musicHint">Upload music you have permission to use. It will be mixed under the generated voiceover and trimmed to the reel duration. Nothing is uploaded to this site.</p>
+      <div class="row" style="margin-top:10px">
+        <label style="margin-bottom:0">Track volume</label><span class="val" id="volVal">70%</span>
+      </div>
+      <input type="range" id="volSlider" min="0" max="100" step="1" value="70">
+    </div>
+
+    <div class="field btnrow">
+      <button id="previewBtn">▶ Preview</button>
+      <button id="exportBtn" class="primary">● Export video</button>
+    </div>
+
+    <div class="download" id="downloadRow">
+      <a id="downloadLink" download="ad.webm">Download file</a>
+    </div>
+
+    <p class="hint">Preview loops in the canvas. Generate a local AI voiceover, optionally add music, then export the canvas with the mixed audio. Speech generation runs in your browser; the first model download is large and requires an internet connection. It tries MP4 first and falls back to WebM if your browser can't encode MP4 — since this is just for you, whichever one your browser gives you should be fine to use directly, or you can drop the WebM into VLC/ffmpeg once to convert it if you specifically need an .mp4 file.</p>
+  </div>
+
+  <div class="stage">
+    <div class="phone">
+      <canvas id="stage" width="1080" height="1920"></canvas>
+    </div>
+
+    <div class="timeline">
+      <div class="trow" id="chipRow"></div>
+      <div class="statusline">
+        <span class="msg" id="statusMsg">Enter a script and press Preview.</span>
+        <span id="timeMsg">00:00 / 00:00</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+const scriptInput = document.getElementById('scriptInput');
+const durSlider = document.getElementById('durSlider');
+const durVal = document.getElementById('durVal');
+const previewBtn = document.getElementById('previewBtn');
+const exportBtn = document.getElementById('exportBtn');
+const statusMsg = document.getElementById('statusMsg');
+const timeMsg = document.getElementById('timeMsg');
+const chipRow = document.getElementById('chipRow');
+const downloadRow = document.getElementById('downloadRow');
+const downloadLink = document.getElementById('downloadLink');
+const bgHint = document.getElementById('bgHint');
+const musicInput = document.getElementById('musicInput');
+const volSlider = document.getElementById('volSlider');
+const volVal = document.getElementById('volVal');
+const aiVoiceSelect = document.getElementById('aiVoiceSelect');
+const generateVoiceBtn = document.getElementById('generateVoiceBtn');
+const downloadVoiceBtn = document.getElementById('downloadVoiceBtn');
+const voicePreview = document.getElementById('voicePreview');
+const voiceStatus = document.getElementById('voiceStatus');
+const rateSlider = document.getElementById('rateSlider');
+const rateVal = document.getElementById('rateVal');
+
+let kokoroTTS = null;
+let generatedVoiceBlob = null;
+let generatedVoiceUrl = null;
+let generatedVoiceBuffer = null;
+let audioContext = null;
+let audioDestination = null;
+let exportAudioSources = [];
+let exportOriginalSlideDuration = null;
+
+rateSlider.addEventListener('input', () => {
+  rateVal.textContent = parseFloat(rateSlider.value).toFixed(1) + 'x';
+});
+
+function floatToWavBlob(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeString = (offset, value) => {
+    for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i));
+  };
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 32768 : s * 32767, true);
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+generateVoiceBtn.addEventListener('click', async () => {
+  const text = (scriptInput.value || '').trim();
+  if (!text) {
+    voiceStatus.textContent = 'Enter your reel script first, then generate the voiceover.';
+    return;
+  }
+  generateVoiceBtn.disabled = true;
+  downloadVoiceBtn.disabled = true;
+  voiceStatus.textContent = 'Loading the free AI speech engine… The first load can take several minutes.';
+  try {
+    if (!kokoroTTS) {
+      const { KokoroTTS } = await import('https://esm.sh/kokoro-js@1.2.1');
+      voiceStatus.textContent = 'Downloading and preparing the AI voice model. Please keep this tab open…';
+      kokoroTTS = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
+        dtype: 'q8',
+        device: 'wasm'
+      });
+    }
+    voiceStatus.textContent = 'Generating narration… Keep this tab open until it finishes.';
+    const audio = await kokoroTTS.generate(text, {
+      voice: aiVoiceSelect.value,
+      speed: parseFloat(rateSlider.value)
+    });
+    generatedVoiceBlob = floatToWavBlob(audio.audio, audio.sampling_rate || 24000);
+    if (generatedVoiceUrl) URL.revokeObjectURL(generatedVoiceUrl);
+    generatedVoiceUrl = URL.createObjectURL(generatedVoiceBlob);
+    voicePreview.src = generatedVoiceUrl;
+    voicePreview.style.display = 'block';
+    downloadVoiceBtn.disabled = false;
+    voiceStatus.textContent = 'Voiceover ready. It will be included in the exported video; uploaded background music will be mixed underneath it.';
+  } catch (err) {
+    console.error('[ReelMaker] AI voice generation failed:', err);
+    voiceStatus.textContent = 'AI voiceover failed to load or generate. Check your internet connection, then try again. Details: ' + (err && err.message ? err.message : String(err));
+  } finally {
+    generateVoiceBtn.disabled = false;
+  }
+});
+
+downloadVoiceBtn.addEventListener('click', () => {
+  if (!generatedVoiceBlob) return;
+  const url = URL.createObjectURL(generatedVoiceBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'reel-voiceover.wav';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+let bgMode = 'studio';
+let slideDuration = parseFloat(durSlider.value);
+let sentences = [];
+let images = [];
+let rafId = null;
+let mode = 'idle'; // 'idle' | 'preview' | 'recording'
+let startTime = 0;
+let recorder = null;
+let chunks = [];
+let musicFile = null;
+let musicEl = null;
+
+musicInput.addEventListener('change', () => {
+  musicFile = musicInput.files[0] || null;
+});
+volSlider.addEventListener('input', () => {
+  volVal.textContent = volSlider.value + '%';
+  if (musicEl) musicEl.volume = volSlider.value / 100;
+});
+
+const bgHints = {
+  studio: 'Solid animated gradient, no external images.',
+  sunrise: 'Solid animated gradient, no external images.',
+  ocean: 'Solid animated gradient, no external images.',
+  photo: 'Pulls a keyword from each sentence and searches Wikimedia Commons for a matching photo — free, no API key or signup. Any slide with no good match falls back to a gradient.'
+};
+
+document.getElementById('bgSwatches').addEventListener('click', (e) => {
+  const el = e.target.closest('.swatch');
+  if (!el) return;
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  bgMode = el.dataset.bg;
+  bgHint.textContent = bgHints[bgMode];
+  images = [];
+});
+
+durSlider.addEventListener('input', () => {
+  slideDuration = parseFloat(durSlider.value);
+  durVal.textContent = slideDuration.toFixed(1) + 's';
+});
+
+function splitSentences(text) {
+  const raw = text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  return raw.length ? raw : [];
+}
+
+function wrapLines(text, maxWidth, font) {
+  ctx.font = font;
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = w;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+const STOPWORDS = new Set(['a','an','the','is','are','was','were','be','been','being','to','of','in','on','at',
+  'for','with','by','as','it','its','this','that','these','those','and','or','but','if','then','so','than',
+  'too','very','can','will','just','not','no','yes','you','your','yours','we','our','ours','they','their',
+  'i','my','me','get','got','now','today','here','there','from','into','about','up','out','over','under',
+  'again','more','most','some','any','all','each','both','only','own','same','such','also','use','used',
+  'using','new','free','best','top','one','two','more','have','has','had','do','does','did']);
+
+function extractKeyword(sentence) {
+  const words = sentence.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(Boolean);
+  const candidates = [...new Set(words.filter(w => w.length > 3 && !STOPWORDS.has(w)))];
+  candidates.sort((a, b) => b.length - a.length);
+  const picked = candidates.slice(0, 2);
+  return picked.length ? picked.join(' ') : 'abstract texture';
+}
+
+async function fetchCommonsImageUrl(keyword) {
+  const endpoint = 'https://commons.wikimedia.org/w/api.php?action=query&generator=search'
+    + '&gsrnamespace=6&gsrlimit=12&gsrsearch=' + encodeURIComponent(keyword + ' filetype:bitmap')
+    + '&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1080&format=json&origin=*';
+  try {
+    const res = await fetch(endpoint);
+    if (!res.ok) {
+      console.warn('[ReelMaker] Commons search HTTP error', res.status, keyword);
+      return null;
+    }
+    const data = await res.json();
+    const pages = data && data.query && data.query.pages;
+    if (!pages) {
+      console.warn('[ReelMaker] Commons search returned no pages for', keyword, data);
+      return null;
+    }
+    const candidates = Object.values(pages)
+      .map(p => p.imageinfo && p.imageinfo[0])
+      .filter(info => info && info.mime && info.mime.startsWith('image/') && info.mime !== 'image/svg+xml'
+        && info.width >= 500 && info.height >= 500);
+    if (!candidates.length) {
+      console.warn('[ReelMaker] No suitable candidates for', keyword);
+      return null;
+    }
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    return chosen.thumburl || chosen.url;
+  } catch (e) {
+    console.error('[ReelMaker] Commons fetch threw for', keyword, e);
+    return null;
+  }
+}
+
+async function loadImageSafe(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error('http ' + res.status);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const img = await new Promise((resolve) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => resolve(null);
+      el.src = objUrl;
+    });
+    if (img) return img;
+  } catch (e) {
+    console.warn('[ReelMaker] fetch-based image load failed, trying plain <img> fallback for', url, e);
+  }
+  // Fallback: some sandboxed environments block fetch() (connect-src) but still
+  // allow <img> tags to load cross-origin (img-src). This may leave the canvas
+  // "tainted" for recording, but at least confirms whether the image itself is reachable.
+  return await new Promise((resolve) => {
+    const el = new Image();
+    el.crossOrigin = 'anonymous';
+    el.onload = () => resolve(el);
+    el.onerror = () => { console.error('[ReelMaker] plain <img> fallback also failed for', url); resolve(null); };
+    el.src = url;
+  });
+}
+
+let photoStatusNote = '';
+
+async function preparePhotos() {
+  statusMsg.textContent = 'Finding relevant images…';
+  const keywords = sentences.map(extractKeyword);
+  const urls = await Promise.all(keywords.map(fetchCommonsImageUrl));
+  images = await Promise.all(urls.map(loadImageSafe));
+  const loaded = images.filter(Boolean).length;
+  console.log('[ReelMaker] keywords:', keywords, '— images loaded:', loaded, '/', images.length);
+  photoStatusNote = loaded
+    ? `(${loaded}/${images.length} slide photos found — open DevTools console for details)`
+    : '(no photos loaded — likely blocked by network/CORS here; open the file directly in a browser tab and check the console — see chat for why)';
+}
+
+function drawBackground(idx, tSec) {
+  if (bgMode === 'photo' && images[idx]) {
+    const img = images[idx];
+    // cover-fit
+    const scale = Math.max(W / img.width, H / img.height);
+    const iw = img.width * scale, ih = img.height * scale;
+    ctx.drawImage(img, (W - iw) / 2, (H - ih) / 2, iw, ih);
+    const grad = ctx.createLinearGradient(0, H * 0.35, 0, H);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.72)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+  const palettes = {
+    studio: ['#15171a', '#33373d'],
+    sunrise: ['#3a1f4d', '#e0703c'],
+    ocean: ['#0d3b3f', '#1b6ea8'],
+    photo: ['#2a2a2a', '#555555']
+  };
+  const [c1, c2] = palettes[bgMode];
+  const angle = (tSec * 6) % 360;
+  const rad = angle * Math.PI / 180;
+  const x1 = W/2 + Math.cos(rad) * W, y1 = H/2 + Math.sin(rad) * H;
+  const x2 = W/2 - Math.cos(rad) * W, y2 = H/2 - Math.sin(rad) * H;
+  const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+  grad.addColorStop(0, c1);
+  grad.addColorStop(1, c2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // floating accent circle for motion
+  const bob = Math.sin(tSec * 1.3) * 40;
+  ctx.beginPath();
+  ctx.arc(W * 0.82, H * 0.22 + bob, 130, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(W * 0.15, H * 0.78 - bob, 90, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.fill();
+}
+
+function drawProgress(idx, n, localProg) {
+  const pad = 40, gap = 10;
+  const w = (W - pad * 2 - gap * (n - 1)) / n;
+  for (let i = 0; i < n; i++) {
+    const x = pad + i * (w + gap);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(x, 56, w, 6);
+    let fill = 0;
+    if (i < idx) fill = 1;
+    if (i === idx) fill = localProg;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(x, 56, w * fill, 6);
+  }
+}
+
+function easeOutCubic(x){ return 1 - Math.pow(1 - x, 3); }
+
+function drawRoundedRect(x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+  }
+  ctx.closePath();
+}
+
+function drawSlide(idx, localT) {
+  const durMs = slideDuration * 1000;
+  const p = Math.max(0, Math.min(1, localT / durMs));
+  let alpha = 1, offsetY = 0;
+  const inWin = 0.18, outWin = 0.15;
+  if (p < inWin) {
+    const e = easeOutCubic(p / inWin);
+    alpha = e;
+    offsetY = (1 - e) * 46;
+  } else if (p > 1 - outWin) {
+    const e = (p - (1 - outWin)) / outWin;
+    alpha = 1 - e;
+    offsetY = -e * 30;
+  }
+
+  const text = sentences[idx] || '';
+  const maxWidth = W - 140;
+  const font = '800 108px ' + getComputedStyle(document.body).fontFamily;
+  const lines = wrapLines(text, maxWidth, font);
+  const lineHeight = 134;
+  const blockHeight = lines.length * lineHeight;
+  const startY = H * 0.62 - blockHeight / 2;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+
+  // legibility card behind the text — keeps it readable over bright or busy
+  // photo backgrounds, not just dark gradients
+  const cardPadX = 44, cardTop = 116, cardBottom = 56;
+  const cardX = 40;
+  const cardW = W - 80;
+  const cardY = startY - cardTop + offsetY;
+  const cardH = blockHeight - lineHeight + cardTop + cardBottom + (108 * 0.3);
+  drawRoundedRect(cardX, cardY, cardW, cardH, 28);
+  ctx.fillStyle = 'rgba(10,10,12,0.58)';
+  ctx.fill();
+
+  // accent bar
+  ctx.fillStyle = '#ffb020';
+  ctx.fillRect(70, startY - 70 + offsetY, 84, 14);
+
+  ctx.font = font;
+  ctx.fillStyle = '#f8f8f6';
+  lines.forEach((line, i) => {
+    ctx.fillText(line, 70, startY + i * lineHeight + offsetY, maxWidth);
+  });
+  ctx.restore();
+}
+
+function frame(now) {
+  if (!startTime) startTime = now;
+  const elapsedMs = now - startTime;
+  const durMs = slideDuration * 1000;
+  const total = sentences.length * durMs;
+
+  let effElapsed = elapsedMs;
+  if (mode === 'preview') effElapsed = elapsedMs % total;
+
+  if (mode === 'recording' && elapsedMs >= total) {
+    stopRecording();
+    return;
+  }
+
+  const idx = Math.min(sentences.length - 1, Math.floor(effElapsed / durMs));
+  const localT = effElapsed - idx * durMs;
+  const tSec = now / 1000;
+
+
+  drawBackground(idx, tSec);
+  drawSlide(idx, localT);
+  drawProgress(idx, sentences.length, localT / durMs);
+
+  updateTimeline(idx, localT / durMs, effElapsed, total);
+
+  rafId = requestAnimationFrame(frame);
+}
+
+function updateTimeline(idx, localProg, elapsedMs, totalMs) {
+  const chips = chipRow.children;
+  for (let i = 0; i < chips.length; i++) {
+    const fill = chips[i].querySelector('.fill');
+    if (i < idx) fill.style.width = '100%';
+    else if (i === idx) fill.style.width = (localProg * 100).toFixed(0) + '%';
+    else fill.style.width = '0%';
+  }
+  const fmt = s => {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  };
+  timeMsg.textContent = `${fmt(elapsedMs/1000)} / ${fmt(totalMs/1000)}`;
+}
+
+function buildChips(n) {
+  chipRow.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const chip = document.createElement('div');
+    chip.className = 'slidechip';
+    chip.innerHTML = '<div class="fill"></div>';
+    chipRow.appendChild(chip);
+  }
+}
+
+function stopLoop() {
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  startTime = 0;
+}
+
+async function getReadySentences() {
+  sentences = splitSentences(scriptInput.value);
+  if (!sentences.length) {
+    statusMsg.textContent = 'Write a script first — each sentence becomes a slide.';
+    return false;
+  }
+  buildChips(sentences.length);
+  if (bgMode === 'photo') {
+    await preparePhotos();
+  }
+  return true;
+}
+
+previewBtn.addEventListener('click', async () => {
+  stopLoop();
+  mode = 'idle';
+  photoStatusNote = '';
+  const ok = await getReadySentences();
+  if (!ok) return;
+  mode = 'preview';
+  statusMsg.textContent = 'Previewing (loops until you export)… ' + photoStatusNote;
+  rafId = requestAnimationFrame(frame);
+});
+
+exportBtn.addEventListener('click', async () => {
+  stopLoop();
+  mode = 'idle';
+  photoStatusNote = '';
+
+  downloadRow.style.display = 'none';
+  exportBtn.disabled = true;
+  previewBtn.disabled = true;
+
+  const videoStream = canvas.captureStream(30);
+  let stream = videoStream;
+  let audioAttached = false;
+  exportAudioSources = [];
+
+  try {
+    if (generatedVoiceBlob || musicFile) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      await audioContext.resume();
+      audioDestination = audioContext.createMediaStreamDestination();
+
+      if (generatedVoiceBlob) {
+        const voiceBytes = await generatedVoiceBlob.arrayBuffer();
+        generatedVoiceBuffer = await audioContext.decodeAudioData(voiceBytes.slice(0));
+        const voiceSource = audioContext.createBufferSource();
+        const voiceGain = audioContext.createGain();
+        voiceSource.buffer = generatedVoiceBuffer;
+        voiceGain.gain.value = 1;
+        voiceSource.connect(voiceGain);
+        voiceGain.connect(audioDestination);
+        exportAudioSources.push(voiceSource);
+      }
+
+      if (musicFile) {
+        const musicBytes = await musicFile.arrayBuffer();
+        const musicBuffer = await audioContext.decodeAudioData(musicBytes.slice(0));
+        const musicSource = audioContext.createBufferSource();
+        const musicGain = audioContext.createGain();
+        musicSource.buffer = musicBuffer;
+        musicSource.loop = true;
+        musicGain.gain.value = Math.max(0, Math.min(1, parseFloat(volSlider.value) / 100));
+        musicSource.connect(musicGain);
+        musicGain.connect(audioDestination);
+        exportAudioSources.push(musicSource);
+      }
+
+      const audioTracks = audioDestination.stream.getAudioTracks();
+      if (audioTracks.length) {
+        stream = new MediaStream([...videoStream.getVideoTracks(), ...audioTracks]);
+        audioAttached = true;
+      }
+    }
+  } catch (err) {
+    console.error('[ReelMaker] Could not prepare mixed audio:', err);
+    statusMsg.textContent = 'Audio setup failed; exporting video without audio. Try a WAV/MP3 music file or a shorter script.';
+    stream = videoStream;
+    audioAttached = false;
+  }
+
+  const ok = await getReadySentences();
+  if (!ok) { exportBtn.disabled = false; previewBtn.disabled = false; return; }
+
+  // Give each caption slide enough time for the complete narration to finish.
+  exportOriginalSlideDuration = slideDuration;
+  if (generatedVoiceBuffer && sentences.length) {
+    slideDuration = Math.max(slideDuration, (generatedVoiceBuffer.duration / sentences.length) + 0.12);
+  }
+
+  // IMPORTANT: when the stream carries audio, the mimeType must declare an
+  // audio codec too, or most browsers silently record video-only.
+  const videoOnlyCandidates = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const withAudioCandidates = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  const candidates = audioAttached ? withAudioCandidates : videoOnlyCandidates;
+
+  let mimeType = candidates.find(c => MediaRecorder.isTypeSupported(c)) || 'video/webm';
+  let ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+
+  if (musicFile && !audioAttached) {
+    statusMsg.textContent = 'Music couldn\'t attach in this browser — recording silent video…';
+  }
+
+  chunks = [];
+  try {
+    recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+  } catch (err) {
+    recorder = new MediaRecorder(stream);
+    ext = 'webm';
+  }
+  recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
+    const url = URL.createObjectURL(blob);
+    downloadLink.href = url;
+    downloadLink.download = 'ad.' + ext;
+    downloadLink.textContent = `Download ${ext.toUpperCase()} (${(blob.size/1024/1024).toFixed(1)} MB)`;
+    downloadRow.style.display = 'flex';
+    statusMsg.textContent = audioAttached ? 'Done — video with voiceover/music ready below.' : 'Done — your video is ready below.';
+    exportBtn.disabled = false;
+    previewBtn.disabled = false;
+    if (exportOriginalSlideDuration !== null) {
+      slideDuration = exportOriginalSlideDuration;
+      exportOriginalSlideDuration = null;
+    }
+    exportAudioSources = [];
+    if (audioContext) {
+      const oldContext = audioContext;
+      audioContext = null;
+      audioDestination = null;
+      oldContext.close().catch(() => {});
+    }
+  };
+
+  recorder.start();
+  if (audioAttached && audioContext) {
+    try {
+      const startAt = audioContext.currentTime + 0.08;
+      exportAudioSources.forEach(source => source.start(startAt));
+    } catch (err) {
+      console.warn('[ReelMaker] Could not start one or more audio tracks:', err);
+    }
+  }
+  mode = 'recording';
+  statusMsg.textContent = 'Recording… ' + photoStatusNote;
+  rafId = requestAnimationFrame(frame);
+});
+
+function stopRecording() {
+  stopLoop();
+  mode = 'idle';
+  if (musicEl) musicEl.pause();
+  exportAudioSources.forEach(source => { try { source.stop(); } catch (_) {} });
+  if (recorder && recorder.state !== 'inactive') recorder.stop();
+}
+</script>
+
+</body>
+</html>
