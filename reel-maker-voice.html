@@ -205,26 +205,36 @@
     <div class="field">
       <div class="row"><label style="margin-bottom:0">Seconds per slide</label><span class="val" id="durVal">2.6s</span></div>
       <input type="range" id="durSlider" min="1.5" max="4.5" step="0.1" value="2.6">
+      <p class="hint">Not used when Automatic voice-over is on — each slide then lasts as long as its sentence takes to say.</p>
     </div>
 
     <div class="field">
-      <label>Voice narration (preview only)</label>
+      <label>Automatic voice-over</label>
       <div class="row">
-        <label style="margin-bottom:0">Speak captions aloud</label>
-        <input type="checkbox" id="narrateToggle">
+        <label style="margin-bottom:0">Read my script aloud in the video</label>
+        <input type="checkbox" id="voiceOn">
       </div>
-      <select id="voiceSelect" style="width:100%; margin-top:8px; background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px;"></select>
+      <select id="voicePick" style="width:100%; margin-top:8px; background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px;">
+        <option value="af_heart">Heart — warm female (US)</option>
+        <option value="af_bella">Bella — bright female (US)</option>
+        <option value="af_nicole">Nicole — calm female (US)</option>
+        <option value="am_michael">Michael — steady male (US)</option>
+        <option value="am_fenrir">Fenrir — deep male (US)</option>
+        <option value="bf_emma">Emma — female (UK)</option>
+        <option value="bm_george">George — male (UK)</option>
+      </select>
       <div class="row" style="margin-top:10px">
-        <label style="margin-bottom:0">Speaking rate</label><span class="val" id="rateVal">1.0x</span>
+        <label style="margin-bottom:0">Speaking speed</label><span class="val" id="rateVal">1.0x</span>
       </div>
-      <input type="range" id="rateSlider" min="0.6" max="1.6" step="0.1" value="1.0">
-      <p class="hint">Free, built into your browser — no account needed. This only plays during Preview so you can check pacing; it can't be baked into the exported video file (browsers don't expose TTS as a recordable audio stream). For narration <em>in</em> the exported video, generate a free MP3 at a site like <a href="https://ttsmp3.com" target="_blank" style="color:var(--teal)">ttsmp3.com</a> and upload it below as your audio track instead.</p>
+      <input type="range" id="rateSlider" min="0.7" max="1.3" step="0.05" value="1.0">
+      <p class="hint" id="voiceHint">Free and automatic: a small voice model runs inside your browser and the voice is recorded straight into the exported video — no account, nothing uploaded. The first time you use it, it downloads a ~90 MB voice model once (then it is remembered). Each slide lasts as long as its sentence takes to say. English voices.</p>
+      <p class="hint" id="voiceStatus" style="color:var(--teal)"></p>
     </div>
 
     <div class="field">
-      <label>Audio track — music or narration (optional)</label>
+      <label>Background music (optional)</label>
       <input type="file" id="musicInput" accept="audio/*">
-      <p class="hint" id="musicHint">Pick a track you've downloaded — <a href="https://www.youtube.com/audiolibrary" target="_blank" style="color:var(--teal)">YouTube Audio Library</a> / <a href="https://pixabay.com/music/" target="_blank" style="color:var(--teal)">Pixabay Music</a> for free music, or <a href="https://ttsmp3.com" target="_blank" style="color:var(--teal)">ttsmp3.com</a> for a free narration MP3. It plays under the export and gets trimmed to the video's length; nothing is uploaded anywhere.</p>
+      <p class="hint" id="musicHint">Pick a track you've downloaded — <a href="https://www.youtube.com/audiolibrary" target="_blank" style="color:var(--teal)">YouTube Audio Library</a> / <a href="https://pixabay.com/music/" target="_blank" style="color:var(--teal)">Pixabay Music</a> are free, royalty-free sources. It loops under the video and automatically gets quieter while the voice-over is speaking. Nothing is uploaded anywhere.</p>
       <div class="row" style="margin-top:10px">
         <label style="margin-bottom:0">Track volume</label><span class="val" id="volVal">70%</span>
       </div>
@@ -277,42 +287,12 @@ const bgHint = document.getElementById('bgHint');
 const musicInput = document.getElementById('musicInput');
 const volSlider = document.getElementById('volSlider');
 const volVal = document.getElementById('volVal');
-const narrateToggle = document.getElementById('narrateToggle');
-const voiceSelect = document.getElementById('voiceSelect');
+const voiceOn = document.getElementById('voiceOn');
+const voicePick = document.getElementById('voicePick');
 const rateSlider = document.getElementById('rateSlider');
 const rateVal = document.getElementById('rateVal');
-
-let availableVoices = [];
-function populateVoices() {
-  availableVoices = speechSynthesis.getVoices();
-  voiceSelect.innerHTML = '';
-  availableVoices.forEach((v, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = v.name + ' (' + v.lang + ')';
-    voiceSelect.appendChild(opt);
-  });
-}
-if ('speechSynthesis' in window) {
-  populateVoices();
-  speechSynthesis.onvoiceschanged = populateVoices;
-} else {
-  narrateToggle.disabled = true;
-}
-rateSlider.addEventListener('input', () => { rateVal.textContent = parseFloat(rateSlider.value).toFixed(1) + 'x'; });
-
-let lastSpokenIdx = -1;
-function speakSlide(idx) {
-  if (!narrateToggle.checked || !('speechSynthesis' in window)) return;
-  if (idx === lastSpokenIdx) return;
-  lastSpokenIdx = idx;
-  speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(sentences[idx] || '');
-  const v = availableVoices[voiceSelect.value];
-  if (v) utter.voice = v;
-  utter.rate = parseFloat(rateSlider.value);
-  speechSynthesis.speak(utter);
-}
+const voiceStatus = document.getElementById('voiceStatus');
+rateSlider.addEventListener('input', () => { rateVal.textContent = parseFloat(rateSlider.value).toFixed(2).replace(/0$/, '') + 'x'; });
 
 let bgMode = 'studio';
 let slideDuration = parseFloat(durSlider.value);
@@ -324,15 +304,131 @@ let startTime = 0;
 let recorder = null;
 let chunks = [];
 let musicFile = null;
-let musicEl = null;
+let musicBuf = null, musicBufFile = null;
 
-musicInput.addEventListener('change', () => {
-  musicFile = musicInput.files[0] || null;
-});
+/* ---------- timeline: each slide can have its own length ---------- */
+let durs = [];    // ms per slide
+let starts = [];  // ms at which each slide begins
+let totalMs = 0;
+let useVoice = false;
+
+function buildTimeline() {
+  const base = slideDuration * 1000;
+  durs = sentences.map((_, i) => {
+    if (useVoice && voiceClips[i]) return Math.max(1800, voiceClips[i].duration * 1000 + 800);
+    return base;
+  });
+  starts = [];
+  let acc = 0;
+  durs.forEach(d => { starts.push(acc); acc += d; });
+  totalMs = acc;
+}
+
+/* ---------- audio engine (Web Audio) ---------- */
+let actx = null;
+let musicGain = null;
+let activeNodes = [];
+const VOICE_LEAD = 0.25; // seconds after a slide appears before the voice starts
+
+function ensureAudio() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  return actx;
+}
+function stopAudioNodes() {
+  activeNodes.forEach(n => { try { n.stop(); } catch (e) {} });
+  activeNodes = [];
+}
+function musicLevel() {
+  return (volSlider.value / 100) * (useVoice ? 0.3 : 1); // music ducks under the voice
+}
+
+musicInput.addEventListener('change', () => { musicFile = musicInput.files[0] || null; });
 volSlider.addEventListener('input', () => {
   volVal.textContent = volSlider.value + '%';
-  if (musicEl) musicEl.volume = volSlider.value / 100;
+  if (musicGain) musicGain.gain.value = musicLevel();
 });
+
+async function getMusicBuffer() {
+  if (!musicFile) return null;
+  if (musicBuf && musicBufFile === musicFile) return musicBuf;
+  try {
+    const ab = await musicFile.arrayBuffer();
+    musicBuf = await ensureAudio().decodeAudioData(ab);
+    musicBufFile = musicFile;
+    return musicBuf;
+  } catch (e) {
+    console.error('[ReelMaker] could not decode music file', e);
+    statusMsg.textContent = 'That music file could not be read — making the video without it.';
+    return null;
+  }
+}
+
+/* ---------- automatic voice-over (Kokoro, runs in the browser) ---------- */
+let tts = null, ttsLoading = null;
+let voiceClips = [];
+const clipCache = new Map();
+
+async function loadVoiceModel() {
+  if (tts) return tts;
+  if (!ttsLoading) {
+    ttsLoading = (async () => {
+      voiceStatus.textContent = 'Loading the voice engine…';
+      const mod = await import('https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/+esm');
+      let lastPct = -1;
+      const t = await mod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
+        dtype: 'q8',
+        device: 'wasm',
+        progress_callback: (p) => {
+          if (p && p.status === 'progress' && typeof p.progress === 'number') {
+            const pct = Math.round(p.progress);
+            if (pct !== lastPct) { lastPct = pct; voiceStatus.textContent = 'Downloading the voice model (one time only)… ' + pct + '%'; }
+          }
+        }
+      });
+      tts = t;
+      return t;
+    })().catch(e => { ttsLoading = null; throw e; });
+  }
+  return ttsLoading;
+}
+
+async function makeVoiceClips() {
+  const engine = await loadVoiceModel();
+  const ac = ensureAudio();
+  const voice = voicePick.value;
+  const speed = parseFloat(rateSlider.value);
+  voiceClips = [];
+  for (let i = 0; i < sentences.length; i++) {
+    const key = voice + '|' + speed + '|' + sentences[i];
+    let buf = clipCache.get(key);
+    if (!buf) {
+      voiceStatus.textContent = 'Recording the voice-over… sentence ' + (i + 1) + ' of ' + sentences.length;
+      const out = await engine.generate(sentences[i], { voice, speed });
+      const samples = out.audio || out.data;
+      const rate = out.sampling_rate || out.sampleRate || 24000;
+      buf = ac.createBuffer(1, samples.length, rate);
+      buf.copyToChannel(samples, 0);
+      clipCache.set(key, buf);
+    }
+    voiceClips.push(buf);
+  }
+  voiceStatus.textContent = 'Voice-over ready (' + sentences.length + ' sentence' + (sentences.length === 1 ? '' : 's') + ').';
+}
+
+// Preview: play one sentence's clip to the speakers when its slide appears.
+let lastVoiceKey = -1;
+function previewVoice(idx, loopNo) {
+  if (!useVoice || !voiceClips[idx]) return;
+  const key = loopNo * 1000 + idx;
+  if (key === lastVoiceKey) return;
+  lastVoiceKey = key;
+  stopAudioNodes();
+  const src = actx.createBufferSource();
+  src.buffer = voiceClips[idx];
+  src.connect(actx.destination);
+  src.start(actx.currentTime + VOICE_LEAD);
+  activeNodes.push(src);
+}
 
 const bgHints = {
   studio: 'Solid animated gradient, no external images.',
@@ -761,8 +857,7 @@ function drawRoundedRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawSlide(idx, localT) {
-  const durMs = slideDuration * 1000;
+function drawSlide(idx, localT, durMs) {
   const p = Math.max(0, Math.min(1, localT / durMs));
   let alpha = 1, offsetY = 0;
   const inWin = 0.18, outWin = 0.15;
@@ -815,25 +910,24 @@ function drawSlide(idx, localT) {
 function frame(now) {
   if (!startTime) startTime = now;
   const elapsedMs = now - startTime;
-  const durMs = slideDuration * 1000;
-  const total = sentences.length * durMs;
-
-  let effElapsed = elapsedMs;
-  if (mode === 'preview') effElapsed = elapsedMs % total;
+  const total = totalMs;
 
   if (mode === 'recording' && elapsedMs >= total) {
     stopRecording();
     return;
   }
 
-  const idx = Math.min(sentences.length - 1, Math.floor(effElapsed / durMs));
-  const localT = effElapsed - idx * durMs;
+  const effElapsed = mode === 'preview' ? elapsedMs % total : elapsedMs;
+  let idx = 0;
+  while (idx < durs.length - 1 && effElapsed >= starts[idx + 1]) idx++;
+  const durMs = durs[idx];
+  const localT = effElapsed - starts[idx];
   const tSec = now / 1000;
 
-  if (mode === 'preview') speakSlide(idx);
+  if (mode === 'preview') previewVoice(idx, Math.floor(elapsedMs / total));
 
   drawBackground(idx, tSec);
-  drawSlide(idx, localT);
+  drawSlide(idx, localT, durMs);
   drawProgress(idx, sentences.length, localT / durMs);
 
   updateTimeline(idx, localT / durMs, effElapsed, total);
@@ -870,8 +964,8 @@ function stopLoop() {
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
   startTime = 0;
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
-  lastSpokenIdx = -1;
+  stopAudioNodes();
+  lastVoiceKey = -1;
 }
 
 async function getReadySentences() {
@@ -884,6 +978,21 @@ async function getReadySentences() {
   if (bgMode === 'photo') {
     await preparePhotos();
   }
+
+  useVoice = false;
+  voiceClips = [];
+  if (voiceOn.checked) {
+    statusMsg.textContent = 'Getting the voice-over ready…';
+    try {
+      await makeVoiceClips();
+      useVoice = true;
+    } catch (e) {
+      console.error('[ReelMaker] voice-over failed', e);
+      voiceStatus.textContent = 'Could not start the voice engine (' + (e && e.message ? e.message : e)
+        + '). Carrying on without a voice-over — check your internet connection and try again.';
+    }
+  }
+  buildTimeline();
   return true;
 }
 
@@ -891,8 +1000,11 @@ previewBtn.addEventListener('click', async () => {
   stopLoop();
   mode = 'idle';
   photoStatusNote = '';
+  ensureAudio();
+  actx.resume();               // inside the click, so the browser allows sound
   const ok = await getReadySentences();
   if (!ok) return;
+  await actx.resume();
   mode = 'preview';
   statusMsg.textContent = 'Previewing (loops until you export)… ' + photoStatusNote;
   rafId = requestAnimationFrame(frame);
@@ -902,77 +1014,34 @@ exportBtn.addEventListener('click', async () => {
   stopLoop();
   mode = 'idle';
   photoStatusNote = '';
+  ensureAudio();
+  actx.resume();               // inside the click, so the browser allows sound
 
   downloadRow.style.display = 'none';
   exportBtn.disabled = true;
   previewBtn.disabled = true;
 
-  const videoStream = canvas.captureStream(30);
-  let stream = videoStream;
-  let audioAttached = false;
-
-  // Do this FIRST, right on the click, before any slower awaits (like the
-  // photo search below) can spend the browser's "this came from a real
-  // click" permission that autoplay needs.
-  if (musicFile) {
-    statusMsg.textContent = 'Loading music…';
-    if (musicEl) {
-      musicEl.pause();
-      URL.revokeObjectURL(musicEl.src);
-      musicEl.remove();
-    }
-    musicEl = new Audio(URL.createObjectURL(musicFile));
-    musicEl.loop = true;
-    musicEl.volume = volSlider.value / 100;
-    musicEl.style.display = 'none';
-    document.body.appendChild(musicEl); // some browsers need it in the DOM for captureStream
-
-    // Play+pause once, right away, while we still have the click's
-    // "user activation" — this unlocks the later real play() call even
-    // after slower awaits (photo search etc.) spend that activation.
-    try { await musicEl.play(); musicEl.pause(); musicEl.currentTime = 0; }
-    catch (e) { console.warn('[ReelMaker] music unlock play() failed', e); }
-
-    if (musicEl.readyState < 2) {
-      await new Promise((resolve) => {
-        musicEl.addEventListener('loadeddata', resolve, { once: true });
-        musicEl.addEventListener('error', resolve, { once: true });
-        setTimeout(resolve, 1500); // safety timeout, local blob should be near-instant
-      });
-    }
-
-    try {
-      const audioStream = musicEl.captureStream ? musicEl.captureStream() : musicEl.mozCaptureStream();
-      const audioTracks = audioStream.getAudioTracks();
-      if (audioTracks.length) {
-        stream = new MediaStream([...videoStream.getVideoTracks(), ...audioTracks]);
-        audioAttached = true;
-      } else {
-        console.warn('[ReelMaker] captureStream gave 0 audio tracks');
-        statusMsg.textContent = 'This browser gave no audio track from the file — recording silent video…';
-      }
-    } catch (err) {
-      console.error('[ReelMaker] captureStream threw', err);
-      statusMsg.textContent = 'This browser can\'t capture audio from media elements — recording silent video…';
-      stream = videoStream;
-    }
-  }
-
   const ok = await getReadySentences();
   if (!ok) { exportBtn.disabled = false; previewBtn.disabled = false; return; }
+  await actx.resume();
 
-  // IMPORTANT: when the stream carries audio, the mimeType must declare an
-  // audio codec too, or most browsers silently record video-only.
+  const mBuf = await getMusicBuffer();
+
+  // Everything audible goes into one recordable destination.
+  const videoStream = canvas.captureStream(30);
+  const dest = actx.createMediaStreamDestination();
+  const hasAudio = !!(useVoice || mBuf);
+  const stream = hasAudio
+    ? new MediaStream([...videoStream.getVideoTracks(), ...dest.stream.getAudioTracks()])
+    : videoStream;
+
+  // With audio in the stream the codec string must name an audio codec too,
+  // or browsers quietly record video only.
   const videoOnlyCandidates = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
   const withAudioCandidates = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
-  const candidates = audioAttached ? withAudioCandidates : videoOnlyCandidates;
-
+  const candidates = hasAudio ? withAudioCandidates : videoOnlyCandidates;
   let mimeType = candidates.find(c => MediaRecorder.isTypeSupported(c)) || 'video/webm';
   let ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
-
-  if (musicFile && !audioAttached) {
-    statusMsg.textContent = 'Music couldn\'t attach in this browser — recording silent video…';
-  }
 
   chunks = [];
   try {
@@ -989,18 +1058,41 @@ exportBtn.addEventListener('click', async () => {
     downloadLink.download = 'ad.' + ext;
     downloadLink.textContent = `Download ${ext.toUpperCase()} (${(blob.size/1024/1024).toFixed(1)} MB)`;
     downloadRow.style.display = 'flex';
-    statusMsg.textContent = audioAttached ? 'Done — video + music ready below.' : 'Done — your video is ready below.';
+    statusMsg.textContent = useVoice
+      ? 'Done — video with voice-over' + (mBuf ? ' and music' : '') + ' is ready below.'
+      : (mBuf ? 'Done — video with music is ready below.' : 'Done — your video is ready below.');
     exportBtn.disabled = false;
     previewBtn.disabled = false;
   };
 
   recorder.start();
-  if (musicEl && audioAttached) {
-    musicEl.currentTime = 0;
-    musicEl.play().catch(err => {
-      statusMsg.textContent = 'Music blocked by the browser (' + err.name + ') — video is recording without it.';
+  const t0 = actx.currentTime + 0.05;
+
+  if (useVoice) {
+    voiceClips.forEach((buf, i) => {
+      const src = actx.createBufferSource();
+      src.buffer = buf;
+      src.connect(dest);
+      src.start(t0 + starts[i] / 1000 + VOICE_LEAD);
+      activeNodes.push(src);
     });
   }
+  if (mBuf) {
+    const src = actx.createBufferSource();
+    src.buffer = mBuf;
+    src.loop = true;
+    musicGain = actx.createGain();
+    const level = musicLevel();
+    const endAt = t0 + totalMs / 1000;
+    musicGain.gain.setValueAtTime(level, t0);
+    musicGain.gain.setValueAtTime(level, Math.max(t0, endAt - 0.9));
+    musicGain.gain.linearRampToValueAtTime(0, endAt);   // gentle fade-out
+    src.connect(musicGain);
+    musicGain.connect(dest);
+    src.start(t0);
+    activeNodes.push(src);
+  }
+
   mode = 'recording';
   statusMsg.textContent = 'Recording… ' + photoStatusNote;
   rafId = requestAnimationFrame(frame);
@@ -1009,7 +1101,6 @@ exportBtn.addEventListener('click', async () => {
 function stopRecording() {
   stopLoop();
   mode = 'idle';
-  if (musicEl) musicEl.pause();
   if (recorder && recorder.state !== 'inactive') recorder.stop();
 }
 </script>
